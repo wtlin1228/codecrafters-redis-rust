@@ -59,12 +59,6 @@ struct Handler {
 impl Handler {
     #[instrument(skip(self))]
     async fn run(&mut self) -> anyhow::Result<()> {
-        // to pass empty ping command
-        self.connection
-            .write_frame(&Frame::Simple("PONG".to_string()))
-            .await?;
-        return Ok(());
-
         while !self.shutdown.is_shutdown {
             let maybe_frame = tokio::select! {
                 res = self.connection.read_frame() => res?,

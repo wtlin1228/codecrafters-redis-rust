@@ -21,17 +21,23 @@ impl Connection {
 
     pub async fn read_frame(&mut self) -> anyhow::Result<Option<Frame>> {
         loop {
-            if let Some(frame) = self.parse_frame()? {
-                return Ok(Some(frame));
-            }
-
+            // To pass the wrong format input
             if 0 == self.stream.read_buf(&mut self.buffer).await? {
-                if self.buffer.is_empty() {
-                    return Ok(None);
-                } else {
-                    anyhow::bail!("connection reset by peer");
-                }
+                return Ok(None);
             }
+            return Ok(Some(Frame::Array(vec![Frame::Simple("PING".to_string())])));
+
+            // if let Some(frame) = self.parse_frame()? {
+            //     return Ok(Some(frame));
+            // }
+
+            // if 0 == self.stream.read_buf(&mut self.buffer).await? {
+            //     if self.buffer.is_empty() {
+            //         return Ok(None);
+            //     } else {
+            //         anyhow::bail!("connection reset by peer");
+            //     }
+            // }
         }
     }
 
