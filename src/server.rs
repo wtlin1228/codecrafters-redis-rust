@@ -1,5 +1,5 @@
+use crate::cmd::Command;
 use crate::connection::Connection;
-use crate::{cmd::Command, frame::Frame};
 use std::future::Future;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
@@ -76,13 +76,7 @@ impl Handler {
 
             debug!(?cmd);
 
-            match cmd {
-                Command::Ping(_) => {
-                    self.connection
-                        .write_frame(&Frame::Simple("PONG".to_string()))
-                        .await?
-                }
-            }
+            cmd.apply(&mut self.connection).await?;
         }
 
         Ok(())

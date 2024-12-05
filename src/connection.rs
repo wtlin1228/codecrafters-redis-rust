@@ -1,4 +1,4 @@
-use crate::frame::Frame;
+use crate::frame::{Frame, FrameError};
 use bytes::{Buf, BytesMut};
 use std::io::{Cursor, Write};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
@@ -21,23 +21,17 @@ impl Connection {
 
     pub async fn read_frame(&mut self) -> anyhow::Result<Option<Frame>> {
         loop {
-            // To pass the wrong format input
-            if 0 == self.stream.read_buf(&mut self.buffer).await? {
-                return Ok(None);
+            if let Some(frame) = self.parse_frame()? {
+                return Ok(Some(frame));
             }
-            return Ok(Some(Frame::Array(vec![Frame::Simple("PING".to_string())])));
 
-            // if let Some(frame) = self.parse_frame()? {
-            //     return Ok(Some(frame));
-            // }
-
-            // if 0 == self.stream.read_buf(&mut self.buffer).await? {
-            //     if self.buffer.is_empty() {
-            //         return Ok(None);
-            //     } else {
-            //         anyhow::bail!("connection reset by peer");
-            //     }
-            // }
+            if 0 == self.stream.read_buf(&mut self.buffer).await? {
+                if self.buffer.is_empty() {
+                    return Ok(None);
+                } else {
+                    anyhow::bail!("connection reset by peer");
+                }
+            }
         }
     }
 
@@ -103,10 +97,13 @@ impl Connection {
     fn parse_frame(&mut self) -> anyhow::Result<Option<Frame>> {
         let mut buf = Cursor::new(&self.buffer[..]);
 
-        let frame = Frame::parse(&mut buf)?;
-
-        self.buffer.advance(buf.position() as usize);
-
-        Ok(Some(frame))
+        match Frame::parse(&mut buf) {
+            Ok(frame) => {
+                self.buffer.advance(buf.position() as usize);
+                Ok(Some(frame))
+            }
+            Err(FrameError::IncompleteError) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
     }
 }
