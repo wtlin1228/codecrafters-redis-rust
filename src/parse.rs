@@ -1,4 +1,5 @@
 use crate::frame::Frame;
+use atoi::atoi;
 use bytes::Bytes;
 use core::str;
 use std::vec;
@@ -46,12 +47,26 @@ impl Parse {
         }
     }
 
-    pub(crate) fn next_bytes(&mut self) -> anyhow::Result<Bytes, ParseError> {
+    pub fn next_bytes(&mut self) -> anyhow::Result<Bytes, ParseError> {
         match self.next()? {
             Frame::Simple(s) => Ok(Bytes::from(s.into_bytes())),
             Frame::Bulk(bytes) => Ok(bytes),
             frame => Err(ParseError::ProtocalError(format!(
                 "expected simple frame or bulk frame, got {:?}",
+                frame
+            ))),
+        }
+    }
+
+    pub fn next_int(&mut self) -> anyhow::Result<u64, ParseError> {
+        match self.next()? {
+            Frame::Integer(v) => Ok(v),
+            Frame::Simple(data) => atoi::<u64>(data.as_bytes())
+                .ok_or_else(|| ParseError::ProtocalError("invalid number".to_string())),
+            Frame::Bulk(data) => atoi::<u64>(&data)
+                .ok_or_else(|| ParseError::ProtocalError("invalid number".to_string())),
+            frame => Err(ParseError::ProtocalError(format!(
+                "expected int frame but got {:?}",
                 frame
             ))),
         }
