@@ -1,5 +1,6 @@
 use crate::cmd::Command;
 use crate::connection::Connection;
+use crate::db::Db;
 use std::future::Future;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
@@ -11,6 +12,7 @@ pub async fn run(listener: TcpListener, shutdown: impl Future) {
     let mut server = Listener {
         listener,
         notify_shutdown,
+        db: Db::new(),
     };
 
     tokio::select! {
@@ -54,6 +56,7 @@ impl Shutdown {
 struct Handler {
     connection: Connection,
     shutdown: Shutdown,
+    db: Db,
 }
 
 impl Handler {
@@ -76,7 +79,7 @@ impl Handler {
 
             debug!(?cmd);
 
-            cmd.apply(&mut self.connection).await?;
+            cmd.apply(&self.db, &mut self.connection).await?;
         }
 
         Ok(())
@@ -87,6 +90,7 @@ impl Handler {
 struct Listener {
     listener: TcpListener,
     notify_shutdown: broadcast::Sender<()>,
+    db: Db,
 }
 
 impl Listener {
@@ -99,6 +103,7 @@ impl Listener {
             let mut handler = Handler {
                 connection: Connection::new(socket),
                 shutdown: Shutdown::new(self.notify_shutdown.subscribe()),
+                db: self.db.clone(),
             };
 
             tokio::spawn(async move {
